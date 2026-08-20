@@ -1,5 +1,6 @@
 <?php
-session_start();
+require "seguridad.php";
+iniciarSesionAplicacion();
 
 if (!isset($_SESSION["usuario_id"])) {
     header("Location: login.php");
@@ -203,7 +204,7 @@ $nombreUsuario = trim(($_SESSION["usuario_nombre"] ?? "Cliente") . " " . ($_SESS
         }
     </style>
 </head>
-<body>
+<body data-csrf="<?= htmlspecialchars(tokenCsrf(), ENT_QUOTES, "UTF-8") ?>">
     <nav class="navbar navbar-expand-sm navbar-cliente sticky-top py-3" aria-label="Navegación principal">
         <div class="container">
             <a class="navbar-brand d-flex align-items-center gap-2 m-0" href="#inicio">
@@ -215,6 +216,7 @@ $nombreUsuario = trim(($_SESSION["usuario_nombre"] ?? "Cliente") . " " . ($_SESS
                 <div class="navbar-nav ms-auto align-items-sm-center gap-sm-2 pt-3 pt-sm-0">
                     <a class="nav-link" href="#inicio">Inicio</a>
                     <a class="nav-link" href="#productos">Productos</a>
+                    <a class="nav-link" href="#compras">Mis compras</a>
                     <a href="logout.php" class="btn btn-salir btn-sm px-3">Cerrar sesión</a>
                 </div>
             </div>
@@ -248,7 +250,27 @@ $nombreUsuario = trim(($_SESSION["usuario_nombre"] ?? "Cliente") . " " . ($_SESS
 
             <div id="listadoProductos" class="row g-3 g-lg-4" aria-live="polite"></div>
         </section>
+
+        <section id="compras" class="mt-5 pt-2" aria-labelledby="titulo-compras">
+            <div class="mb-4">
+                <p class="text-primary fw-semibold mb-1">Mi actividad</p>
+                <h2 id="titulo-compras" class="h3 fw-bold mb-1">Mis compras</h2>
+                <p class="texto-secundario mb-0">Consultá el estado y gestioná las compras que todavía no fueron canceladas.</p>
+            </div>
+            <div class="producto-card p-3 p-md-4">
+                <div class="table-responsive">
+                    <table class="table align-middle mb-0">
+                        <thead><tr><th>ID</th><th>Fecha</th><th>Producto</th><th>Cantidad</th><th>Total</th><th>Estado</th><th>Acciones</th></tr></thead>
+                        <tbody id="comprasBody"><tr><td colspan="7" class="text-center texto-secundario py-4">Cargando compras...</td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
     </main>
+
+    <div class="modal fade" id="modalClienteCantidad" tabindex="-1" aria-labelledby="tituloClienteCantidad" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="formClienteCantidad"><div class="modal-header"><h2 id="tituloClienteCantidad" class="modal-title fs-5">Modificar cantidad</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div><div class="modal-body"><div id="errorClienteCantidad" class="alert alert-danger d-none"></div><input type="hidden" name="venta_id" id="clienteVentaCantidadId"><input type="hidden" name="accion" value="modificar_cantidad"><label for="clienteNuevaCantidad" class="form-label">Nueva cantidad</label><input type="number" min="1" id="clienteNuevaCantidad" name="cantidad" class="form-control" required><label for="clienteMotivoCantidad" class="form-label mt-3">Motivo (opcional)</label><textarea id="clienteMotivoCantidad" name="motivo" class="form-control" maxlength="500" rows="3"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button><button type="submit" class="btn btn-primary">Guardar cambio</button></div></form></div></div></div>
+
+    <div class="modal fade" id="modalClienteCancelar" tabindex="-1" aria-labelledby="tituloClienteCancelar" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form id="formClienteCancelar"><div class="modal-header"><h2 id="tituloClienteCancelar" class="modal-title fs-5">Cancelar compra</h2><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Cerrar"></button></div><div class="modal-body"><div id="errorClienteCancelar" class="alert alert-danger d-none"></div><input type="hidden" name="venta_id" id="clienteVentaCancelarId"><input type="hidden" name="accion" value="cancelar"><p class="texto-secundario">La compra seguirá visible como cancelada.</p><label for="clienteMotivoCancelar" class="form-label">Motivo (opcional)</label><textarea id="clienteMotivoCancelar" name="motivo" class="form-control" maxlength="500" rows="3"></textarea></div><div class="modal-footer"><button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Volver</button><button type="submit" class="btn btn-danger">Cancelar compra</button></div></form></div></div></div>
 
     <footer class="container pb-4 pt-2 text-center">
         <small class="texto-secundario">Control Stock · Tu catálogo siempre disponible</small>
@@ -357,7 +379,115 @@ $nombreUsuario = trim(($_SESSION["usuario_nombre"] ?? "Cliente") . " " . ($_SESS
             }
         }
 
+        function fechaCompraLegible(valor) {
+            if (!valor) return "—";
+            const fecha = new Date(String(valor).replace(" ", "T"));
+            return Number.isNaN(fecha.getTime()) ? valor : fecha.toLocaleString("es-AR");
+        }
+
+        function estadoCompra(estado) {
+            const badge = document.createElement("span");
+            const clases = { ACTIVA: "text-bg-success", MODIFICADA: "text-bg-warning", CANCELADA: "text-bg-danger" };
+            badge.className = `badge ${clases[estado] || "text-bg-secondary"}`;
+            badge.textContent = estado.charAt(0) + estado.slice(1).toLowerCase();
+            return badge;
+        }
+
+        function tdCompra(texto, clase = "") {
+            const td = document.createElement("td");
+            td.className = clase;
+            td.textContent = texto;
+            return td;
+        }
+
+        async function cargarCompras() {
+            const tbody = document.getElementById("comprasBody");
+            try {
+                const respuesta = await fetch("obtener_compras_cliente.php", { headers: { "Accept": "application/json" } });
+                if (!respuesta.ok) throw new Error("No se pudieron cargar las compras.");
+                const compras = await respuesta.json();
+                tbody.replaceChildren();
+                if (compras.length === 0) {
+                    const fila = document.createElement("tr");
+                    const vacio = tdCompra("Todavía no tenés compras asociadas a tu cuenta.", "text-center texto-secundario py-4");
+                    vacio.colSpan = 7;
+                    fila.appendChild(vacio);
+                    tbody.appendChild(fila);
+                    return;
+                }
+                compras.forEach((compra) => {
+                    const fila = document.createElement("tr");
+                    fila.append(tdCompra(`#${compra.id}`, "fw-semibold"));
+                    fila.append(tdCompra(fechaCompraLegible(compra.fecha)));
+                    fila.append(tdCompra(compra.producto_nombre));
+                    fila.append(tdCompra(String(compra.cantidad)));
+                    fila.append(tdCompra(formatoMoneda.format(Number(compra.total)), "fw-semibold"));
+                    const estadoTd = document.createElement("td");
+                    estadoTd.appendChild(estadoCompra(compra.estado));
+                    fila.appendChild(estadoTd);
+                    const acciones = document.createElement("td");
+                    acciones.className = "text-nowrap";
+                    if (compra.estado !== "CANCELADA") {
+                        const cantidad = document.createElement("button");
+                        cantidad.type = "button";
+                        cantidad.className = "btn btn-outline-primary btn-sm me-2";
+                        cantidad.textContent = "Cantidad";
+                        cantidad.addEventListener("click", () => {
+                            document.getElementById("clienteVentaCantidadId").value = compra.id;
+                            document.getElementById("clienteNuevaCantidad").value = compra.cantidad;
+                            bootstrap.Modal.getOrCreateInstance(document.getElementById("modalClienteCantidad")).show();
+                        });
+                        const cancelar = document.createElement("button");
+                        cancelar.type = "button";
+                        cancelar.className = "btn btn-outline-danger btn-sm";
+                        cancelar.textContent = "Cancelar";
+                        cancelar.addEventListener("click", () => {
+                            document.getElementById("clienteVentaCancelarId").value = compra.id;
+                            bootstrap.Modal.getOrCreateInstance(document.getElementById("modalClienteCancelar")).show();
+                        });
+                        acciones.append(cantidad, cancelar);
+                    } else {
+                        acciones.textContent = "—";
+                    }
+                    fila.appendChild(acciones);
+                    tbody.appendChild(fila);
+                });
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="7" class="text-center text-danger py-4">No pudimos cargar tus compras.</td></tr>';
+            }
+        }
+
+        async function enviarCambioCliente(formulario, modalId, errorId) {
+            const errorBox = document.getElementById(errorId);
+            errorBox.classList.add("d-none");
+            try {
+                const respuesta = await fetch("modificar_venta.php", {
+                    method: "POST",
+                    headers: { "X-CSRF-Token": document.body.dataset.csrf },
+                    body: new FormData(formulario)
+                });
+                const datos = await respuesta.json();
+                if (!respuesta.ok) throw new Error(datos.error || "No se pudo actualizar la compra.");
+                bootstrap.Modal.getInstance(document.getElementById(modalId)).hide();
+                formulario.reset();
+                await Promise.all([cargarProductos(), cargarCompras()]);
+            } catch (error) {
+                errorBox.textContent = error.message;
+                errorBox.classList.remove("d-none");
+            }
+        }
+
+        document.getElementById("formClienteCantidad").addEventListener("submit", (evento) => {
+            evento.preventDefault();
+            enviarCambioCliente(evento.currentTarget, "modalClienteCantidad", "errorClienteCantidad");
+        });
+        document.getElementById("formClienteCancelar").addEventListener("submit", (evento) => {
+            evento.preventDefault();
+            enviarCambioCliente(evento.currentTarget, "modalClienteCancelar", "errorClienteCancelar");
+        });
+
         cargarProductos();
+        cargarCompras();
     </script>
 </body>
 </html>

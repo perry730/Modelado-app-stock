@@ -1,32 +1,68 @@
 <?php
-session_start();
+require "seguridad.php";
 require "conexion.php";
+requerirUsuarioJson(["admin", "vendedor"]);
+header("Content-Type: application/json; charset=UTF-8");
+
 $conexion = Conexion::obtenerInstancia();
-header("Content-Type: application/json");
+$desde = trim($_GET["desde"] ?? "");
+$hasta = trim($_GET["hasta"] ?? "");
+$productoIdTexto = trim($_GET["producto_id"] ?? "");
+$estado = strtoupper(trim($_GET["estado"] ?? ""));
+$estadosValidos = ["ACTIVA", "MODIFICADA", "CANCELADA"];
 
-if (!isset($_SESSION["usuario_id"])) {
-    http_response_code(401);
-    echo json_encode(["error" => "No autorizado"]);
-    exit;
+if (($desde !== "" && !fechaIsoValida($desde)) || ($hasta !== "" && !fechaIsoValida($hasta))) {
+    responderJson(["error" => "Ingresá fechas válidas."], 400);
+}
+if ($desde !== "" && $hasta !== "" && $desde > $hasta) {
+    responderJson(["error" => "La fecha desde no puede ser posterior a la fecha hasta."], 400);
+}
+if ($estado !== "" && !in_array($estado, $estadosValidos, true)) {
+    responderJson(["error" => "El estado seleccionado no es válido."], 400);
 }
 
-if (!in_array($_SESSION["usuario_rol"], ["admin", "vendedor"])) {
-    http_response_code(403);
-    echo json_encode(["error" => "No tenés permiso para esta acción"]);
-    exit;
+$condiciones = [];
+$parametros = [];
+if ($desde !== "") {
+    $condiciones[] = "v.fecha >= ?";
+    $parametros[] = $desde . " 00:00:00";
+}
+if ($hasta !== "") {
+    $diaSiguiente = (new DateTimeImmutable($hasta))->modify("+1 day")->format("Y-m-d 00:00:00");
+    $condiciones[] = "v.fecha < ?";
+    $parametros[] = $diaSiguiente;
+}
+if ($productoIdTexto !== "") {
+    if (!ctype_digit($productoIdTexto) || (int) $productoIdTexto <= 0) {
+        responderJson(["error" => "El producto seleccionado no es válido."], 400);
+    }
+    $productoId = (int) $productoIdTexto;
+    $check = $conexion->prepare("SELECT id FROM productos WHERE id = ?");
+    $check->execute([$productoId]);
+    if (!$check->get_result()->fetch_assoc()) {
+        responderJson(["error" => "El producto seleccionado no existe."], 400);
+    }
+    $condiciones[] = "v.producto_id = ?";
+    $parametros[] = $productoId;
+}
+if ($estado !== "") {
+    $condiciones[] = "v.estado = ?";
+    $parametros[] = $estado;
 }
 
-$sql = "SELECT v.id, v.producto_nombre, v.cantidad, v.precio_unitario, v.total, v.fecha, u.nombre AS vendedor
+$sql = "SELECT v.id, v.producto_id, v.producto_nombre, v.cantidad, v.precio_unitario,
+               v.total, v.fecha, v.estado, v.fecha_modificacion, v.motivo_cancelacion,
+               v.cliente_id,
+               CONCAT_WS(' ', cliente.nombre, cliente.apellido) AS cliente,
+               CONCAT_WS(' ', vendedor.nombre, vendedor.apellido) AS vendedor
         FROM ventas v
-        LEFT JOIN usuarios u ON v.usuario_id = u.id
-        ORDER BY v.fecha DESC";
-
-$resultado = $conexion->query($sql);
-$ventas = [];
-
-while ($fila = $resultado->fetch_assoc()) {
-    $ventas[] = $fila;
+        LEFT JOIN usuarios cliente ON v.cliente_id = cliente.id
+        LEFT JOIN usuarios vendedor ON v.usuario_id = vendedor.id";
+if ($condiciones !== []) {
+    $sql .= " WHERE " . implode(" AND ", $condiciones);
 }
+$sql .= " ORDER BY v.fecha DESC, v.id DESC";
 
-echo json_encode($ventas);
-?>
+$stmt = $conexion->prepare($sql);
+$stmt->execute($parametros);
+echo json_encode($stmt->get_result()->fetch_all(MYSQLI_ASSOC), JSON_UNESCAPED_UNICODE);

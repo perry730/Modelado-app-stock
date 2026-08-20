@@ -34,8 +34,15 @@ Para agregar apellidos a una instalación anterior, corré una sola vez
 migracion_apellido_usuarios.sql. Conserva todas las cuentas y datos existentes.
 Las cuentas anteriores completan su apellido en el primer acceso válido.
 
+Para habilitar clientes, estados y auditoría en ventas, corré una sola vez
+migracion_trazabilidad_ventas.sql. Las ventas anteriores se conservan como
+ACTIVA y sin cliente, porque el sistema anterior no guardaba esa relación.
+
+El análisis de segundo factor con Firebase está documentado en FIREBASE_MFA.md.
+No se incluyó una verificación simulada ni credenciales en el proyecto.
+
 - admin: agrega/elimina productos, carga ventas, ve historial completo
-- vendedor: carga ventas y ve historial, pero no puede tocar productos
-- cliente: solo ve la lista de productos, sin sección de ventas
+- vendedor: carga ventas para un cliente, filtra y gestiona el historial
+- cliente: ve productos y gestiona únicamente sus compras asociadas
 
 El rol se asigna únicamente desde el panel de un administrador.

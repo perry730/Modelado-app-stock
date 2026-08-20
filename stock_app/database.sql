@@ -30,7 +30,30 @@ CREATE TABLE IF NOT EXISTS ventas (
     precio_unitario DECIMAL(10,2) NOT NULL,
     total DECIMAL(10,2) NOT NULL,
     usuario_id INT,
+    cliente_id INT NULL,
     fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    estado ENUM('ACTIVA', 'MODIFICADA', 'CANCELADA') NOT NULL DEFAULT 'ACTIVA',
+    fecha_modificacion DATETIME NULL,
+    motivo_cancelacion VARCHAR(500) NULL,
     FOREIGN KEY (producto_id) REFERENCES productos(id),
-    FOREIGN KEY (usuario_id) REFERENCES usuarios(id)
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+    FOREIGN KEY (cliente_id) REFERENCES usuarios(id) ON DELETE SET NULL
+);
+
+-- Auditoría de cambios y cancelaciones de ventas
+CREATE TABLE IF NOT EXISTS venta_historial (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    venta_id INT NOT NULL,
+    usuario_id INT NULL,
+    tipo VARCHAR(40) NOT NULL,
+    cantidad_anterior INT NULL,
+    cantidad_nueva INT NULL,
+    total_anterior DECIMAL(10,2) NULL,
+    total_nuevo DECIMAL(10,2) NULL,
+    estado_anterior VARCHAR(20) NOT NULL,
+    estado_nuevo VARCHAR(20) NOT NULL,
+    motivo VARCHAR(500) NULL,
+    fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (venta_id) REFERENCES ventas(id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
 );
