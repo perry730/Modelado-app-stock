@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PLANES</title>
+     <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <style>
+        h1 {
+            color: black;
+        }
+    body {
+        background-color:  #a5a4a4;
+        background-size: cover;
+        background-position: center;
+        background-repeat: no-repeat;
+    }
+
+    table, td, th{
+        border: 3px solid #0a0a0a;
+        border-collapse: collapse;
+    }
+    table{
+        width: 70%;
+        margin: auto;
+    }
+    td, th{
+        padding: 20px;
+    }
+</style>
+</head>
+<body onload="carga()">
+
+<h1 class="text-center text-light fw-bold mt-4 mb-3">PLANES</h1>
+
+<!-- Planes -->
+<h2 class="text-center text-info fw-semibold mb-4">LISTA DE PLANES</h2>
+
+<div class="text-center">
+  <div id="listadoPlanes" class="d-inline-block w-75"></div>
+  <button onclick="addPlan()" class="btn btn-primary btn-sm mt-3 w-75">Agregar Plan</button>
+</div>
+
+<br><br>
+
+<!-- Ventas -->
+<h2 class="text-center text-info fw-semibold mb-4">VENTAS</h2>
+
+<div class="text-center">
+  <div id="listadoVentas" class="d-inline-block w-75"></div>
+  <button onclick="agregarVenta()" class="btn btn-primary btn-sm mt-3 w-75">Agregar Venta</button>
+</div>
+
+
+<!-- Dialog Planes -->
+<dialog id="DialogoPlanes">
+    <p>Plan:</p>
+    <input type="text" id="inputPlan">
+
+    <p>Puntos:</p>
+    <input type="number" id="inputPuntos">
+
+    <p>Comisión:</p>
+    <input type="number" id="inputComision">
+
+    <br><br>
+    <button onclick="document.getElementById('DialogoPlanes').close()"class="btn btn-danger btn-sm w-100">Cancelar</button>
+    <button onclick="addPlan2()"class="btn btn-success btn-sm w-100">Aceptar</button>
+</dialog>
+
+<!-- Dialog Venta -->
+<dialog id="DialogoVenta">
+    <p>Plan:</p>
+    <select id="listaPlanes"></select>
+
+    <p>Cantidad:</p>
+    <input type="number" id="cantidadInput" min="1">
+
+    <br><br>
+    <button onclick="document.getElementById('DialogoVenta').close()"class="btn btn-danger btn-sm w-100">Cancelar</button>
+    <button onclick="agregarVenta2()"class="btn btn-success btn-sm w-100">Aceptar</button>
+</dialog>
+
+<script>
+function crearPlan(nombre, puntos, comision){
+    return {nombre, puntos, comision};
+}
+
+function crearVenta(plan, cantidad, totalPuntos, totalComision){
+    return {plan, cantidad, totalPuntos, totalComision};
+}
+
+function guardarPlan(nombre, puntos, comision){
+    localStorage.setItem("P_" + nombre, JSON.stringify(crearPlan(nombre, puntos, comision)));
+}
+
+function guardarVenta(plan, cantidad, totalPuntos, totalComision){
+    localStorage.setItem("V_" + plan + "_" + Date.now(), JSON.stringify(crearVenta(plan, cantidad, totalPuntos, totalComision)));
+}
+
+function mostrarPlanes(){
+    let tabla = "";
+    for(let i = 0; i < localStorage.length; i++){
+        let key = localStorage.key(i);
+        if(key.startsWith("P_")){
+            let p = JSON.parse(localStorage.getItem(key));
+            tabla += `
+            <tr>
+                <td>${p.nombre}</td>
+                <td>${p.puntos}</td>
+                <td>${p.comision}</td>
+                <td><button onclick="borrarPlan('${key}') "class="btn btn-danger btn-sm w-100"
+                    >Eliminar</button></td>
+            </tr>`;
+        }
+    }
+
+    document.getElementById("listadoPlanes").innerHTML = `
+    <table>
+        <tr>
+            <th>Plan</th>
+            <th>Puntos</th>
+            <th>Comisión</th>
+            <th>Acción</th>
+        </tr>
+        ${tabla}
+    </table>`;
+}
+
+function borrarPlan(key){
+    localStorage.removeItem(key);
+    mostrarPlanes();
+}
+
+function addPlan(){
+    document.getElementById("DialogoPlanes").showModal();
+}
+
+function addPlan2(){
+    guardarPlan(
+        document.getElementById("inputPlan").value,
+        document.getElementById("inputPuntos").value,
+        document.getElementById("inputComision").value
+    );
+    document.getElementById("DialogoPlanes").close();
+    mostrarPlanes();
+}
+
+function mostrarVentas(){
+    let tabla = "";
+    for(let i = 0; i < localStorage.length; i++){
+        let key = localStorage.key(i);
+        if(key.startsWith("V_")){
+            let v = JSON.parse(localStorage.getItem(key));
+            tabla += `
+            <tr>
+                <td>${v.plan}</td>
+                <td>${v.cantidad}</td>
+                <td>${v.totalPuntos}</td>
+                <td>${v.totalComision}</td>
+            </tr>`;
+        }
+    }
+
+    document.getElementById("listadoVentas").innerHTML = `
+    <table>
+        <tr>
+            <th>Plan</th>
+            <th>Cantidad</th>
+            <th>Total Puntos</th>
+            <th>Total Comisión</th>
+        </tr>
+        ${tabla}
+    </table>`;
+}
+
+function agregarVenta(){
+    let select = document.getElementById("listaPlanes");
+    select.innerHTML = "";
+
+    for(let i = 0; i < localStorage.length; i++){
+        let key = localStorage.key(i);
+        if(key.startsWith("P_")){
+            let p = JSON.parse(localStorage.getItem(key));
+            let op = document.createElement("option");
+            op.value = JSON.stringify(p);
+            op.textContent = p.nombre;
+            select.appendChild(op);
+        }
+    }
+
+    document.getElementById("DialogoVenta").showModal();
+}
+
+function agregarVenta2(){
+    let p = JSON.parse(document.getElementById("listaPlanes").value);
+    let cant = parseInt(document.getElementById("cantidadInput").value);
+
+    guardarVenta(
+        p.nombre,
+        cant,
+        p.puntos * cant,
+        p.comision * cant
+    );
+
+    document.getElementById("DialogoVenta").close();
+    mostrarVentas();
+}
+
+function carga(){
+    mostrarPlanes();
+    mostrarVentas();
+}
+</script>
+
+</body>
+</html>
+
