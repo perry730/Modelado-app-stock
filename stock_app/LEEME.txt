@@ -1,0 +1,36 @@
+CÓMO INSTALARLO (con XAMPP)
+
+1. Copiá toda esta carpeta "stock_app" dentro de htdocs
+   (ej: C:\xampp\htdocs\stock_app)
+
+2. Abrí phpMyAdmin (http://localhost/phpmyadmin)
+   - Andá a la pestaña "SQL"
+   - Pegá todo el contenido de database.sql y ejecutalo
+   (esto crea la base "control_stock" con las tablas usuarios, productos y ventas)
+
+3. Prendé Apache y MySQL desde el panel de XAMPP
+
+4. Entrá a: http://localhost/stock_app/login.php
+   - Primero tenés que crear tu usuario en "Crear cuenta nueva" (dni, nombre, contraseña)
+   - Después iniciás sesión y entrás a stock.php automáticamente
+
+FLUJO DEL SISTEMA
+- login.php / registro.php: login y alta de usuarios
+- stock.php: pantalla principal (protegida, solo si iniciaste sesión)
+- LISTA DE PRODUCTOS: cargás productos con nombre, precio y stock
+- VENTAS: elegís un producto y una cantidad; el sistema calcula el total,
+  descuenta el stock automáticamente y guarda quién hizo la venta
+
+Si conexion.php no conecta, revisá que $usuario y $clave coincidan con
+tu configuración de MySQL (por defecto en XAMPP es root sin contraseña).
+
+SISTEMA DE ROLES (3 NIVELES)
+Si ya tenías la base creada, corré en phpMyAdmin el archivo agregar_roles.sql
+(solo agrega la columna "rol" a la tabla usuarios, no borra nada).
+
+- admin: agrega/elimina productos, carga ventas, ve historial completo
+- vendedor: carga ventas y ve historial, pero no puede tocar productos
+- cliente: solo ve la lista de productos, sin sección de ventas
+
+El rol se elige al crear la cuenta en registro.php. Podés crear varios
+usuarios de prueba con distintos roles para ver cómo cambia la pantalla.
