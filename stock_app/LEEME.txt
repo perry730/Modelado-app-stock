@@ -11,12 +11,14 @@ CÓMO INSTALARLO (con XAMPP)
 3. Prendé Apache y MySQL desde el panel de XAMPP
 
 4. Entrá a: http://localhost/stock_app/login.php
-   - Primero tenés que crear tu usuario en "Crear cuenta nueva" (dni, nombre, contraseña)
-   - Después iniciás sesión y entrás a stock.php automáticamente
+   - El acceso solicita DNI, nombre, apellido y contraseña.
+   - Solo un administrador puede crear cuentas desde la sección "Usuarios".
 
 FLUJO DEL SISTEMA
-- login.php / registro.php: login y alta de usuarios
-- stock.php: pantalla principal (protegida, solo si iniciaste sesión)
+- login.php: acceso público (sin registro de cuentas)
+- registro.php: gestión de usuarios protegida, exclusiva para administradores
+- admin.php / vendedor.php / cliente.php: paneles separados por rol
+- stock.php: redirección segura al panel correspondiente
 - LISTA DE PRODUCTOS: cargás productos con nombre, precio y stock
 - VENTAS: elegís un producto y una cantidad; el sistema calcula el total,
   descuenta el stock automáticamente y guarda quién hizo la venta
@@ -28,9 +30,12 @@ SISTEMA DE ROLES (3 NIVELES)
 Si ya tenías la base creada, corré en phpMyAdmin el archivo agregar_roles.sql
 (solo agrega la columna "rol" a la tabla usuarios, no borra nada).
 
+Para agregar apellidos a una instalación anterior, corré una sola vez
+migracion_apellido_usuarios.sql. Conserva todas las cuentas y datos existentes.
+Las cuentas anteriores completan su apellido en el primer acceso válido.
+
 - admin: agrega/elimina productos, carga ventas, ve historial completo
 - vendedor: carga ventas y ve historial, pero no puede tocar productos
 - cliente: solo ve la lista de productos, sin sección de ventas
 
-El rol se elige al crear la cuenta en registro.php. Podés crear varios
-usuarios de prueba con distintos roles para ver cómo cambia la pantalla.
+El rol se asigna únicamente desde el panel de un administrador.
